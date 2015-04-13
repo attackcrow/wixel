@@ -1,51 +1,69 @@
-/** Quiz Button App
+/**  Quiz Button App
 This application is designed for a simple quiz button system, where 
 only one button can be active at once. The app has three states:
 Ready - LED off, Waiting for a button press or message from another Wixel
 Active - LED on, broadcasting active state
 Locked - LED off, waiting for locked timer to expire
 
+== Parameters ==
+
+radio_channel: See description in radio_link.h.
 */
 
-#include <wixel.h>
-#include <radio_queue.h>
+/** Dependencies **************************************************************/
+#include <cc2511_map.h>
+#include <gpio.h>
+#include <board.h>
+#include <random.h>
+#include <time.h>
+
 #include <usb.h>
 #include <usb_com.h>
-#include <stdio.h>
-#include <ctype.h>
+#include <radio_queue.h>
 
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+/** Parameters ****************************************************************/
 uint32 CODE param_lockout_ms = 2000;
+
+/** Definitions ***************************************************************/
+typedef enum
+{
+    READY,
+    ACTIVE,
+    LOCKED
+} state_t ;
 
 #define BUTTON_PIN 16
 
+/** Variables *****************************************************************/
 static uint32 lock_time = 0;
-#define READY 0
-#define ACTIVE 1
-#define LOCKED 2
 
-void printPacket(uint8 XDATA *);
-void putchar(char);
+/** Functions *****************************************************************/
+void printPacket(uint8 XDATA * pkt);
 
-void updateLeds(uint32 state)
+void updateLeds(state_t state)
 {
     usbShowStatusWithGreenLed();
 
-    if (state == ACTIVE)
+    switch(state)
     {
-        LED_YELLOW(0);
-        LED_RED(1);
-    }
-    else if (state == LOCKED)
-    {
-        LED_YELLOW(1);
-        LED_RED(0);
-    }
-    else
-    {
-        LED_YELLOW(0);
-        LED_RED(0);
+        case ACTIVE:
+            LED_YELLOW(0);
+            LED_RED(1);
+            break;
+        case LOCKED:
+            LED_YELLOW(1);
+            LED_RED(0);
+            break;
+        default:
+            LED_YELLOW(0);
+            LED_RED(0);
+            break;
     }
 }
+
 
 void sendActive(void)
 {
@@ -65,7 +83,7 @@ void sendActive(void)
 
 BIT receiveActive(void)
 {
-   uint8 XDATA * packet = radioQueueTxCurrentPacket();
+   uint8 XDATA * packet = radioQueueRxCurrentPacket();
    BIT retval = 0;
    if (packet != 0)
    {
@@ -79,9 +97,9 @@ BIT receiveActive(void)
    return retval;
 }
 
-uint32 updateState(const uint32 state)
+state_t updateState(const state_t state)
 {
-    uint32 newstate = state;
+    state_t newstate = state;
     BIT gotActive = receiveActive();
     switch(state)
     {
@@ -114,26 +132,6 @@ uint32 updateState(const uint32 state)
     return newstate;
 }
 
-void main(void)
-{
-    uint32 state = READY;
-    int sent = 0;
-
-    systemInit();
-    usbInit();
-
-    setDigitalInput(BUTTON_PIN, HIGH);
-    radioQueueInit();
-
-    while(1)
-    {
-        boardService();
-        state = updateState(state);
-        updateLeds(state);
-        usbComService();
-    }
-}
-
 
 // This is called by printf and printPacket.
 void putchar(char c)
@@ -147,7 +145,6 @@ char nibbleToAscii(uint8 nibble)
     if (nibble <= 0x9){ return '0' + nibble; }
     else{ return 'A' + (nibble - 0xA); }
 }
-
 
 void printPacket(uint8 XDATA * pkt)
 {
@@ -203,7 +200,6 @@ void printPacket(uint8 XDATA * pkt)
         case 3: printf("RESET "); break;
     }
 
-
     // payload type
     putchar('p');
     putchar(':');
@@ -220,3 +216,31 @@ void printPacket(uint8 XDATA * pkt)
     putchar('\n');
 }
 
+void printPacketIfNeeded()
+{
+    uint8 XDATA * packet;
+    if ((packet = radioQueueRxCurrentPacket()) && usbComTxAvailable() >= 128)
+    {
+        printPacket(packet);
+        radioQueueRxDoneWithPacket();
+    }
+}
+
+void main()
+{
+    state_t state = READY;
+    systemInit();
+    usbInit();
+
+    radioQueueInit();
+    //radioQueueAllowCrcErrors = 1;
+
+    while(1)
+    {
+        boardService();
+        updateLeds(state);
+        usbComService();
+        state = updateState(state);
+        //printPacketIfNeeded();
+    }
+}
