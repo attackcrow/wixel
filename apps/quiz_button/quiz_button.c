@@ -8,6 +8,7 @@ Locked - LED off, waiting for locked timer to expire
 == Parameters ==
 
 radio_channel: See description in radio_link.h.
+lockout_ms: Duration (in ms) to lockout when a button press is detected.
 */
 
 /** Dependencies **************************************************************/
