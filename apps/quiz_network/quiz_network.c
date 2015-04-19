@@ -18,7 +18,7 @@ packets format:
 byte 0    Length
      1    Command
      2-5  Source
-     6-9  Time Remaining
+     6-7  Time Remaining
 
 Master sends 0000 for source, other nodes send their serial number as source.
 Currently, 'C' is the only command, which indicates that buttons should 
@@ -98,26 +98,31 @@ void updateLeds(state_t state)
             LED_RED(0);
             break;
         default:
-            //LED_YELLOW(pin > 5000);
             LED_YELLOW(0);
             LED_RED(0);
             break;
     }
 }
 
-uint8 sendActive(uint8 cmd, uint8 *addr)
+uint8 sendActive(uint8 cmd, uint8 *addr, uint32 timeLeft)
 {
    uint8 XDATA * packet = radioQueueTxCurrentPacket();
    uint8 queued = radioQueueTxQueued();
    // NOTE: We don't want to queue up packets since they can cause timing problems
    if (!queued && packet != 0)
    {
-       packet[0] = 5;
+       packet[0] = 7;
        packet[1] = cmd;
        packet[2] = addr[0];
        packet[3] = addr[1];
        packet[4] = addr[2];
        packet[5] = addr[3];
+       packet[6] = (uint8)((timeLeft & 0xFF00) >> 8);
+       packet[7] = (uint8)(timeLeft & 0xFF);
+
+#ifdef PACKET_DEBUG
+       DEBUG_PRINTF("t: %02x%02x\r\n", packet[6], packet[7]);
+#endif
 
        radioQueueTxSendPacket();
        return 1;
@@ -141,10 +146,10 @@ BIT receiveActive(void)
 
 uint32 getNextSendTime()
 {
-    uint8 m = param_master ? 40 : 80;
+    uint8 m = param_master ? 60 : 120;
     uint32 next = getMs() + (uint32)(randomNumber() % m) + 20;
     // Dont resend if 250ms from unlock
-    if ( next > (unlockTime - 750) ) 
+    if ( next > (unlockTime - 250) ) 
     {
         next = ~0;
     }
@@ -169,26 +174,25 @@ state_t updateState(const state_t state)
     int gotLock = 0;
     static nextSendTime;
     static BIT prevButtonPress = 0;
+    uint32 remoteTime = 0;
     
     if (packet) 
     {
 #ifdef PACKET_DEBUG
         if (usbComTxAvailable() >= 20) 
         {
-            DEBUG_PRINTF("%d RECV %d %c %02x%02x-%02x%02x\r\n", state, packet[0], 
-                         packet[1], packet[2], packet[3], packet[4], packet[5]);
+            DEBUG_PRINTF("%d RECV %d %c %02x%02x-%02x%02x %02x%02x\r\n", state, packet[0], 
+                         packet[1], packet[2], packet[3], packet[4], packet[5], 
+                         packet[6], packet[7]);
         }
 #endif
         // Check for a transition packet
-        if (param_master && packet[0] == 5 && packet[1] == 'C')
+        if ((param_master && packet[0] == 7 && packet[1] == 'C')
+           || (!param_master && packet[0] == 7 && packet[1] == 'A'))
         {
             gotLock = 1;
             src = &packet[2];
-        }
-        else if(!param_master && packet[0] == 5 && packet[1] == 'A')
-        {
-            gotLock = 1;
-            src = &packet[2];
+            remoteTime = (uint32)packet[6] << 8 | (uint32)packet[7];
         }
         radioQueueRxDoneWithPacket();
     }
@@ -201,14 +205,14 @@ state_t updateState(const state_t state)
                 if (param_master)
                 {
                     setActive(src);
-                    if (sendActive('A', active_addr))
+                    if (sendActive('A', active_addr, remoteTime))
                         nextSendTime = getNextSendTime();
                     else
                         nextSendTime = getMs();
                 }
                 newState = LOCKED;
-                unlockTime = getMs() + param_lockout_ms;
-                printf("lock\r\n");
+                unlockTime = getMs() + remoteTime;
+                DEBUG_PRINTF("lock\r\n");
             }
             else if (isPinHigh(BUTTON_PIN) == LOW && !prevButtonPress)
             {
@@ -218,7 +222,7 @@ state_t updateState(const state_t state)
                     unlockTime = getMs() + param_lockout_ms;
                     setActive(serialNumber);
 
-                    if (sendActive('A', serialNumber))
+                    if (sendActive('A', serialNumber, param_lockout_ms))
                         nextSendTime = getNextSendTime();
                     else
                         nextSendTime = getMs();
@@ -228,7 +232,7 @@ state_t updateState(const state_t state)
                 {
                     newState = ARM_ACTIVE;
                     unlockTime = getMs() + param_lockout_ms;
-                    if (sendActive('C', serialNumber))
+                    if (sendActive('C', serialNumber, param_lockout_ms))
                         nextSendTime = getNextSendTime();
                     else
                         nextSendTime = getMs();
@@ -253,11 +257,12 @@ state_t updateState(const state_t state)
                 {
                     DEBUG_PRINTF("l\r\n");
                     newState = LOCKED;
+                    unlockTime = remoteTime;
                 }
             } 
             else if (getMs() > nextSendTime) // resend
             {
-                sendActive('C', serialNumber);
+                sendActive('C', serialNumber, unlockTime - getMs());
                 nextSendTime = getNextSendTime();
             }
             break;
@@ -268,7 +273,7 @@ state_t updateState(const state_t state)
             }
             else if (param_master && getMs() > nextSendTime)
             {
-                if (sendActive('A', serialNumber))
+                if (sendActive('A', serialNumber, unlockTime - getMs()))
                     nextSendTime = getNextSendTime();
                 else
                     nextSendTime = getMs();
@@ -281,7 +286,7 @@ state_t updateState(const state_t state)
             }
             else if (param_master && getMs() > nextSendTime)
             {
-                if (sendActive('A', serialNumber))
+                if (sendActive('A', serialNumber, unlockTime - getMs()))
                     nextSendTime = getNextSendTime();
                 else
                     nextSendTime = getMs();
