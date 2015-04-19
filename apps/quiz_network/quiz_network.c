@@ -18,7 +18,7 @@ packets format:
 byte 0    Length
      1    Command
      2-5  Source
-     6-9  Winner (only from master)
+     6-9  Time Remaining
 
 Master sends 0000 for source, other nodes send their serial number as source.
 Currently, 'C' is the only command, which indicates that buttons should 
@@ -48,7 +48,8 @@ uint32 CODE param_lockout_ms = 2000;
 uint32 CODE param_master = 0;
 
 //#define DEBUG
-//#define USE_USB
+//#define PACKET_DEBUG
+#define USE_USB
 
 #ifdef DEBUG
 #define DEBUG_PRINTF(...) printf( __VA_ARGS__)
@@ -69,7 +70,7 @@ typedef enum
 #define MASTER_RESENDS 10
 
 /** Variables *****************************************************************/
-static uint32 lock_time = 0;
+static uint32 unlockTime = 0;
 
 /** Functions *****************************************************************/
 void printPacket(uint8 XDATA * pkt);
@@ -104,10 +105,12 @@ void updateLeds(state_t state)
     }
 }
 
-void sendActive(uint8 cmd, uint8 *addr)
+uint8 sendActive(uint8 cmd, uint8 *addr)
 {
    uint8 XDATA * packet = radioQueueTxCurrentPacket();
-   if (packet != 0)
+   uint8 queued = radioQueueTxQueued();
+   // NOTE: We don't want to queue up packets since they can cause timing problems
+   if (!queued && packet != 0)
    {
        packet[0] = 5;
        packet[1] = cmd;
@@ -117,7 +120,9 @@ void sendActive(uint8 cmd, uint8 *addr)
        packet[5] = addr[3];
 
        radioQueueTxSendPacket();
+       return 1;
    }
+   return 0;
 }
 
 BIT receiveActive(void)
@@ -139,17 +144,13 @@ uint32 getNextSendTime()
     uint8 m = param_master ? 40 : 80;
     uint32 next = getMs() + (uint32)(randomNumber() % m) + 20;
     // Dont resend if 250ms from unlock
-    if ( next > (lock_time + param_lockout_ms - 750) ) 
+    if ( next > (unlockTime - 750) ) 
     {
-        next = 0;
+        next = ~0;
     }
     return next;
 }
 
-uint32 getLockTime()
-{
-    return lock_time;
-}
 
 static uint8 active_addr[4];
 #define setActive( a ) { \
@@ -161,16 +162,17 @@ static uint8 active_addr[4];
 
 state_t updateState(const state_t state)
 {
-    state_t newstate = state;
-    state_t oldstate = state;
+    state_t newState = state;
+    state_t oldState = state;
     uint8 XDATA *packet = radioQueueRxCurrentPacket();
     uint8 XDATA *src = NULL;
     int gotLock = 0;
     static nextSendTime;
+    static BIT prevButtonPress = 0;
     
     if (packet) 
     {
-#ifdef DEBUG
+#ifdef PACKET_DEBUG
         if (usbComTxAvailable() >= 20) 
         {
             DEBUG_PRINTF("%d RECV %d %c %02x%02x-%02x%02x\r\n", state, packet[0], 
@@ -189,11 +191,6 @@ state_t updateState(const state_t state)
             src = &packet[2];
         }
         radioQueueRxDoneWithPacket();
-        // Discard any other packets
-        while (gotLock && radioQueueRxCurrentPacket())
-        {
-            radioQueueRxDoneWithPacket();
-        }
     }
 
     switch(state)
@@ -204,46 +201,58 @@ state_t updateState(const state_t state)
                 if (param_master)
                 {
                     setActive(src);
-                    sendActive('A', active_addr);
-                    nextSendTime = getNextSendTime();
+                    if (sendActive('A', active_addr))
+                        nextSendTime = getNextSendTime();
+                    else
+                        nextSendTime = getMs();
                 }
-                // If we're getting a lock for ourselves, ignore it
-                newstate = LOCKED;
-                lock_time = getMs();
+                newState = LOCKED;
+                unlockTime = getMs() + param_lockout_ms;
                 printf("lock\r\n");
             }
-            else if (isPinHigh(BUTTON_PIN) == LOW)
+            else if (isPinHigh(BUTTON_PIN) == LOW && !prevButtonPress)
             {
                 if (param_master)
                 {
-                    newstate = ACTIVE;
-                    lock_time = getMs();
+                    newState = ACTIVE;
+                    unlockTime = getMs() + param_lockout_ms;
                     setActive(serialNumber);
-                    sendActive('A', active_addr);
-                    nextSendTime = getNextSendTime();
+
+                    if (sendActive('A', serialNumber))
+                        nextSendTime = getNextSendTime();
+                    else
+                        nextSendTime = getMs();
+
                 }
                 else
                 {
-                    newstate = ARM_ACTIVE;
-                    lock_time = getMs();
-                    sendActive('C', serialNumber);
-                    nextSendTime = getNextSendTime();
+                    newState = ARM_ACTIVE;
+                    unlockTime = getMs() + param_lockout_ms;
+                    if (sendActive('C', serialNumber))
+                        nextSendTime = getNextSendTime();
+                    else
+                        nextSendTime = getMs();
                 }
             }
             break;
         case ARM_ACTIVE:
             // Only slaves can get into this state
-            if (gotLock)
+            if (getMs() > unlockTime)
+            {
+                // Didn't hear back from the master so fail
+                newState = READY;
+            }
+            else if (gotLock)
             { 
                 if (memcmp(src, serialNumber, 4) == 0)
                 {
                     DEBUG_PRINTF("L\r\n");
-                    newstate = ACTIVE;
+                    newState = ACTIVE;
                 }
                 else // Locked on someone else
                 {
                     DEBUG_PRINTF("l\r\n");
-                    newstate = LOCKED;
+                    newState = LOCKED;
                 }
             } 
             else if (getMs() > nextSendTime) // resend
@@ -253,29 +262,35 @@ state_t updateState(const state_t state)
             }
             break;
         case ACTIVE:
-            if (getMs() - lock_time > param_lockout_ms)
+            if (getMs() > unlockTime)
             {
-                newstate = READY;
+                newState = READY;
             }
             else if (param_master && getMs() > nextSendTime)
             {
-                nextSendTime = getNextSendTime();
-                sendActive('A', active_addr);
+                if (sendActive('A', serialNumber))
+                    nextSendTime = getNextSendTime();
+                else
+                    nextSendTime = getMs();
             }
             break;
         case LOCKED:
-            if (getMs() - lock_time > param_lockout_ms)
+            if (getMs() > unlockTime)
             {
-                newstate = READY;
+                newState = READY;
             }
             else if (param_master && getMs() > nextSendTime)
             {
-                nextSendTime = getNextSendTime();
-                sendActive('A', active_addr);
+                if (sendActive('A', serialNumber))
+                    nextSendTime = getNextSendTime();
+                else
+                    nextSendTime = getMs();
             }
             break;
     }
-    return newstate;
+
+    prevButtonPress = (isPinHigh(BUTTON_PIN) == LOW); 
+    return newState;
 }
 
 // This is called by printf and printPacket.
