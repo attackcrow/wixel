@@ -89,6 +89,7 @@ typedef enum
 
 #define BUTTON_PIN 16
 #define MASTER_RESENDS 10
+#define LED_PIN 10
 
 /** Variables *****************************************************************/
 static uint32 unlockTime = 0;
@@ -98,13 +99,14 @@ void printPacket(uint8 XDATA * pkt);
 
 void updateLeds(state_t state)
 {
-    static int pin = 0;
+    // Time for LED toggle
     static uint32 flashTime = 0;
+    // On/Off state of LEDs
     static BIT ledState = 0;
+    // On/Off ratio for LED
+    static uint32 dutyCycle[2] = {200, 300};
+
     usbShowStatusWithGreenLed();
-    pin++;
-    if (pin > 10000) pin = 0;
-    setDigitalOutput(10, pin > 5000);
 
     switch(state)
     {
@@ -112,22 +114,26 @@ void updateLeds(state_t state)
             LED_YELLOW(0);
             if (getMs() > flashTime)
             {
-                flashTime = getMs() + 400;
                 ledState = !ledState;
+                flashTime = getMs() + dutyCycle[ledState];
             }
             LED_RED(ledState);
+            setDigitalOutput(LED_PIN, ledState);
             break;
         case ARM_ACTIVE:
             LED_YELLOW(1);
             LED_RED(1);
+            setDigitalOutput(LED_PIN, 0);
             break;
         case LOCKED:
             LED_YELLOW(1);
             LED_RED(0);
+            setDigitalOutput(LED_PIN, 0);
             break;
         default:
             LED_YELLOW(0);
             LED_RED(0);
+            setDigitalOutput(LED_PIN, 0);
             ledState = 0;
             break;
     }
@@ -342,7 +348,7 @@ void main()
 #endif
 
     radioQueueInit();
-    //radioQueueAllowCrcErrors = 1;
+    setDigitalOutput(LED_PIN, 0);
     
     randomSeedFromSerialNumber();
 
