@@ -25,7 +25,28 @@ Currently, 'C' is the only command, which indicates that buttons should
 transition to Locked state. Messages from the master include a Winner, which
 is the ID of the node whose message was received first.
 
-// TODO: Add time stamp for packet
+Copyright 2015 Jeff Crow.
+
+Permission is hereby granted, free of charge, to any person
+obtaining a copy of this software and associated documentation
+files (the "Software"), to deal in the Software without
+restriction, including without limitation the rights to use,
+copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
 
 */
 
@@ -78,6 +99,8 @@ void printPacket(uint8 XDATA * pkt);
 void updateLeds(state_t state)
 {
     static int pin = 0;
+    static uint32 flashTime = 0;
+    static BIT ledState = 0;
     usbShowStatusWithGreenLed();
     pin++;
     if (pin > 10000) pin = 0;
@@ -87,7 +110,12 @@ void updateLeds(state_t state)
     {
         case ACTIVE:
             LED_YELLOW(0);
-            LED_RED(1);
+            if (getMs() > flashTime)
+            {
+                flashTime = getMs() + 400;
+                ledState = !ledState;
+            }
+            LED_RED(ledState);
             break;
         case ARM_ACTIVE:
             LED_YELLOW(1);
@@ -100,6 +128,7 @@ void updateLeds(state_t state)
         default:
             LED_YELLOW(0);
             LED_RED(0);
+            ledState = 0;
             break;
     }
 }
@@ -108,7 +137,7 @@ uint8 sendActive(uint8 cmd, uint8 *addr, uint32 timeLeft)
 {
    uint8 XDATA * packet = radioQueueTxCurrentPacket();
    uint8 queued = radioQueueTxQueued();
-   // NOTE: We don't want to queue up packets since they can cause timing problems
+   // NOTE: We don't want to queue up packets since they may be stale when actually sent
    if (!queued && packet != 0)
    {
        packet[0] = 7;
@@ -121,7 +150,7 @@ uint8 sendActive(uint8 cmd, uint8 *addr, uint32 timeLeft)
        packet[7] = (uint8)(timeLeft & 0xFF);
 
 #ifdef PACKET_DEBUG
-       DEBUG_PRINTF("t: %02x%02x\r\n", packet[6], packet[7]);
+       DEBUG_PRINTF("t: %02x%02x %lu\r\n", packet[6], packet[7], getMs());
 #endif
 
        radioQueueTxSendPacket();
