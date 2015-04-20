@@ -150,7 +150,10 @@ uint8 sendActive(uint8 cmd, uint8 *addr, uint32 timeLeft)
        packet[7] = (uint8)(timeLeft & 0xFF);
 
 #ifdef PACKET_DEBUG
-       DEBUG_PRINTF("t: %02x%02x %lu\r\n", packet[6], packet[7], getMs());
+       if (usbComTxAvailable() >= 20) 
+       {
+           DEBUG_PRINTF("t: %02x%02x %lu\r\n", packet[6], packet[7], getMs());
+       }
 #endif
 
        radioQueueTxSendPacket();
@@ -241,7 +244,6 @@ state_t updateState(const state_t state)
                 }
                 newState = LOCKED;
                 unlockTime = getMs() + remoteTime;
-                DEBUG_PRINTF("lock\r\n");
             }
             else if (isPinHigh(BUTTON_PIN) == LOW && !prevButtonPress)
             {
@@ -279,12 +281,10 @@ state_t updateState(const state_t state)
             { 
                 if (memcmp(src, serialNumber, 4) == 0)
                 {
-                    DEBUG_PRINTF("L\r\n");
                     newState = ACTIVE;
                 }
                 else // Locked on someone else
                 {
-                    DEBUG_PRINTF("l\r\n");
                     newState = LOCKED;
                     unlockTime = remoteTime;
                 }
