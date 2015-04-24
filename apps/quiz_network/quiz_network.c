@@ -68,6 +68,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 uint32 CODE param_lockout_ms = 2000;
 uint32 CODE param_master = 0;
 
+/** Debug Definitions *********************************************************/
 //#define DEBUG
 //#define PACKET_DEBUG
 #define USE_USB
@@ -87,9 +88,9 @@ typedef enum
     LOCKED
 } state_t ;
 
+#define WIN_LED 10
 #define BUTTON_PIN 16
 #define MASTER_RESENDS 10
-#define LED_PIN 10
 
 /** Variables *****************************************************************/
 static uint32 unlockTime = 0;
@@ -104,7 +105,8 @@ void updateLeds(state_t state)
     // On/Off state of LEDs
     static BIT ledState = 0;
     // On/Off ratio for LED
-    static uint32 dutyCycle[2] = {200, 300};
+    const uint32 dutyCycle[2] = {200, 300};
+    static uint32 blip = 0;
 
     usbShowStatusWithGreenLed();
 
@@ -118,23 +120,28 @@ void updateLeds(state_t state)
                 flashTime = getMs() + dutyCycle[ledState];
             }
             LED_RED(ledState);
-            setDigitalOutput(LED_PIN, ledState);
+            setDigitalOutput(WIN_LED, ledState);
             break;
         case ARM_ACTIVE:
             LED_YELLOW(1);
             LED_RED(1);
-            setDigitalOutput(LED_PIN, 0);
+            setDigitalOutput(WIN_LED, 0);
             break;
         case LOCKED:
             LED_YELLOW(1);
             LED_RED(0);
-            setDigitalOutput(LED_PIN, 0);
+            setDigitalOutput(WIN_LED, 0);
             break;
         default:
             LED_YELLOW(0);
             LED_RED(0);
-            setDigitalOutput(LED_PIN, 0);
+            // Flash Win LED as power indication
+            setDigitalOutput(WIN_LED, blip <= 2);
             ledState = 0;
+            if (blip++ == 200000)
+            {
+                blip = 0;
+            }
             break;
     }
 }
@@ -348,7 +355,7 @@ void main()
 #endif
 
     radioQueueInit();
-    setDigitalOutput(LED_PIN, 0);
+    setDigitalOutput(WIN_LED, 0);
     
     randomSeedFromSerialNumber();
 
