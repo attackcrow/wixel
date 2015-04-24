@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<export version="D">
+  <design>
+    <source>/Users/jeffro/Documents/KiCAD/Quiz/Quiz.sch</source>
+    <date>Friday, April 24, 2015 'PMt' 04:15:41 PM</date>
+    <tool>Eeschema (2015-04-23 BZR 5622)-product</tool>
+    <sheet number="1" name="/" tstamps="/">
+      <title_block>
+        <title>Wixel Quiz Button</title>
+        <company/>
+        <rev/>
+        <date/>
+        <source>Quiz.sch</source>
+        <comment number="1" value=""/>
+        <comment number="2" value=""/>
+        <comment number="3" value=""/>
+        <comment number="4" value=""/>
+      </title_block>
+    </sheet>
+  </design>
+  <components>
+    <comp ref="BT1">
+      <value>6V</value>
+      <libsource lib="device" part="Battery"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamp>553AA46D</tstamp>
+    </comp>
+    <comp ref="U1">
+      <value>WIXEL</value>
+      <libsource lib="special" part="Wixel"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamp>553ACCBA</tstamp>
+    </comp>
+    <comp ref="SW1">
+      <value>PUSH</value>
+      <libsource lib="device" part="SW_PUSH"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamp>553ACCFF</tstamp>
+    </comp>
+    <comp ref="D1">
+      <value>LED</value>
+      <libsource lib="device" part="LED"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamp>553ACD68</tstamp>
+    </comp>
+  </components>
+  <libparts>
+    <libpart lib="device" part="Battery">
+      <fields>
+        <field name="Reference">BT</field>
+        <field name="Value">Battery</field>
+      </fields>
+      <pins>
+        <pin num="1" name="~" type="passive"/>
+        <pin num="2" name="~" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="device" part="LED">
+      <footprints>
+        <fp>LED-3MM</fp>
+        <fp>LED-5MM</fp>
+        <fp>LED-10MM</fp>
+        <fp>LED-0603</fp>
+        <fp>LED-0805</fp>
+        <fp>LED-1206</fp>
+        <fp>LEDV</fp>
+      </footprints>
+      <fields>
+        <field name="Reference">D</field>
+        <field name="Value">LED</field>
+      </fields>
+      <pins>
+        <pin num="1" name="A" type="passive"/>
+        <pin num="2" name="K" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="device" part="SW_PUSH">
+      <description>Push Button</description>
+      <fields>
+        <field name="Reference">SW</field>
+        <field name="Value">SW_PUSH</field>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="special" part="Wixel">
+      <aliases>
+        <alias>XC3030-PC68</alias>
+      </aliases>
+      <fields>
+        <field name="Reference">U</field>
+        <field name="Value">Wixel</field>
+      </fields>
+      <pins>
+        <pin num="1" name="GND" type="BiDi"/>
+        <pin num="2" name="VIN" type="input"/>
+        <pin num="3" name="VALT" type="input"/>
+        <pin num="4" name="P0_0" type="BiDi"/>
+        <pin num="5" name="P0_1" type="input"/>
+        <pin num="6" name="P0_2" type="BiDi"/>
+        <pin num="7" name="P0_3" type="BiDi"/>
+        <pin num="8" name="P0_4" type="BiDi"/>
+        <pin num="9" name="P0_5" type="input"/>
+        <pin num="10" name="P2_1" type="output"/>
+        <pin num="11" name="P2_2" type="output"/>
+        <pin num="12" name="GND" type="passive"/>
+        <pin num="13" name="3V3" type="passive"/>
+        <pin num="14" name="RST" type="input"/>
+        <pin num="15" name="P1_7" type="passive"/>
+        <pin num="16" name="P1_6" type="passive"/>
+        <pin num="17" name="P1_5" type="passive"/>
+        <pin num="18" name="P1_4" type="passive"/>
+        <pin num="19" name="P1_3" type="passive"/>
+        <pin num="20" name="P1_2" type="passive"/>
+        <pin num="21" name="P1_1" type="passive"/>
+        <pin num="22" name="P1_0" type="passive"/>
+        <pin num="23" name="GND" type="passive"/>
+      </pins>
+    </libpart>
+  </libparts>
+  <libraries>
+    <library logical="device">
+      <uri>/Library/Application Support/kicad/library/device.lib</uri>
+    </library>
+    <library logical="special">
+      <uri>/Library/Application Support/kicad/library/special.lib</uri>
+    </library>
+  </libraries>
+  <nets>
+    <net code="1" name="Net-(U1-Pad15)">
+      <node ref="U1" pin="15"/>
+    </net>
+    <net code="2" name="Net-(U1-Pad17)">
+      <node ref="U1" pin="17"/>
+    </net>
+    <net code="3" name="Net-(U1-Pad18)">
+      <node ref="U1" pin="18"/>
+    </net>
+    <net code="4" name="Net-(U1-Pad19)">
+      <node ref="U1" pin="19"/>
+    </net>
+    <net code="5" name="Net-(SW1-Pad1)">
+      <node ref="U1" pin="16"/>
+      <node ref="SW1" pin="1"/>
+    </net>
+    <net code="6" name="Net-(D1-Pad2)">
+      <node ref="U1" pin="23"/>
+      <node ref="D1" pin="2"/>
+      <node ref="SW1" pin="2"/>
+    </net>
+    <net code="7" name="Net-(D1-Pad1)">
+      <node ref="D1" pin="1"/>
+      <node ref="U1" pin="22"/>
+    </net>
+    <net code="8" name="Net-(BT1-Pad2)">
+      <node ref="U1" pin="1"/>
+      <node ref="BT1" pin="2"/>
+    </net>
+    <net code="9" name="Net-(BT1-Pad1)">
+      <node ref="U1" pin="2"/>
+      <node ref="BT1" pin="1"/>
+    </net>
+    <net code="10" name="Net-(U1-Pad3)">
+      <node ref="U1" pin="3"/>
+    </net>
+    <net code="11" name="Net-(U1-Pad4)">
+      <node ref="U1" pin="4"/>
+    </net>
+    <net code="12" name="Net-(U1-Pad5)">
+      <node ref="U1" pin="5"/>
+    </net>
+    <net code="13" name="Net-(U1-Pad6)">
+      <node ref="U1" pin="6"/>
+    </net>
+    <net code="14" name="Net-(U1-Pad7)">
+      <node ref="U1" pin="7"/>
+    </net>
+    <net code="15" name="Net-(U1-Pad8)">
+      <node ref="U1" pin="8"/>
+    </net>
+    <net code="16" name="Net-(U1-Pad9)">
+      <node ref="U1" pin="9"/>
+    </net>
+    <net code="17" name="Net-(U1-Pad10)">
+      <node ref="U1" pin="10"/>
+    </net>
+    <net code="18" name="Net-(U1-Pad20)">
+      <node ref="U1" pin="20"/>
+    </net>
+    <net code="19" name="Net-(U1-Pad11)">
+      <node ref="U1" pin="11"/>
+    </net>
+    <net code="20" name="Net-(U1-Pad21)">
+      <node ref="U1" pin="21"/>
+    </net>
+    <net code="21" name="Net-(U1-Pad12)">
+      <node ref="U1" pin="12"/>
+    </net>
+    <net code="22" name="Net-(U1-Pad13)">
+      <node ref="U1" pin="13"/>
+    </net>
+    <net code="23" name="Net-(U1-Pad14)">
+      <node ref="U1" pin="14"/>
+    </net>
+  </nets>
+</export>
